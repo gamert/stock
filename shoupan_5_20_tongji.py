@@ -1,22 +1,24 @@
 #获取5日，10日，20日均线数据
+from datetime import datetime
 
+import jqdatasdk
+import numpy
 import tushare as ts
 import talib
 from matplotlib import pyplot as plt
 import pandas as pd
 
+import baostock as bs
+
+from jqdatasdk import *
+
+
+from QUANTAXIS.QAFetch import QATdx as QATdx
+
 # 合并
 ## pd.concat([df2,df3],axis=0,join='inner')
 ## pd.concat([df2,df3],axis=1,join='inner')
 # df_merge =df1.merge(df3,on=['a','b'])
-
-pro = ts.pro_api()
-dat = pro.query('stock_basic', fields='symbol,name')
-
-def get_name(stoke_code):
-    '''通过股票代码导出公司名称'''
-    company_name = list(dat.loc[dat['symbol'] == stoke_code].name)[0]
-    return company_name
 
 pd.set_option('display.max_columns', None)
 #pd.set_option('max_colwidth',100)
@@ -25,7 +27,32 @@ pd.set_option('display.max_rows',500)
 pd.set_option('display.max_columns',500)
 pd.set_option('display.width',1000)
 
-def Fetch5_20(codes, ktype='D', start='2020-01-01',end='2020-04-14'):
+method = 3 # 0 tushare 1 Bao 2 jqdatasdk 3 tdx
+pro = ts.pro_api()
+dat = pro.query('stock_basic', fields='symbol,name')
+
+if method == 1:
+    #### 登陆系统 ####
+    lg = bs.login()
+    # 显示登陆返回信息
+    print('login respond error_code:'+lg.error_code)
+    print('login respond  error_msg:'+lg.error_msg)
+
+if method == 2:
+    jqdatasdk.auth("13761609001", "0")
+    is_auth = is_auth()
+    print(is_auth)
+    print(jqdatasdk.__version__)
+    print(get_query_count())
+
+
+def get_name(stoke_code):
+    '''通过股票代码导出公司名称'''
+    company_name = list(dat.loc[dat['symbol'] == stoke_code].name)[0]
+    return company_name
+
+
+def Fetch5_20(codes, ktype='D', start='2020-01-01',end='2020-04-15'):
     # newdf = pd.DataFrame(data=None, index=None, columns=None, dtype=None, copy=False)
     newdf = pd.DataFrame(columns=['date', 'open', 'close', 'high', 'low', 'volume', 'code', 'ma5', 'ma10', 'ma20', 'ma60', 'ma120', 'ma250'])
     names = []
@@ -34,10 +61,49 @@ def Fetch5_20(codes, ktype='D', start='2020-01-01',end='2020-04-14'):
     for code in codes:
         names.append(get_name(code))
         # 通过tushare获取股票信息
-        df = ts.get_k_data(code,ktype=ktype, start=start,
-                           end=end)  # 以股票代码[601888]中国国旅为例，提取从2018-01-12到2018-10-30的收盘价
+        if method == 0:
+            # df = pro.query()
+            stock_fields = "trade_date, open, close, high, low, vol , ts_code "
+            code_wm = code.startswith("6") and code+".SH" or code+".SZ";
+            # df = pro.share_float(ts_code=code_wm, start_date=start, end_date=end, fields=stock_fields)
+            #df = ts.pro_bar(ts_code=code_wm, adj='qfq', freq=ktype, start_date=start.replace("-", ""), end_date=end.replace("-",""))
+            ## 更新时间晚于21:30
+            df = ts.get_k_data(code,ktype=ktype, start=start, end=end)
+            closed = df['close'].values
         # 提取收盘价
-        closed = df['close'].values
+        elif method == 1:
+            bcode = code.startswith("6") and "sh."+code or "sz."+code;
+            rs = bs.query_history_k_data_plus(bcode,
+                                              "date,open,high,low,close,volume,code",
+                                              start_date=start, end_date=end,
+                                              frequency=ktype, adjustflag="3")
+            #### 打印结果集 ####
+            data_list = []
+            while (rs.error_code == '0') & rs.next():
+                # 获取一条记录，将记录合并在一起
+                data_list.append(rs.get_row_data())
+            df = pd.DataFrame(data_list, columns=rs.fields)
+            df['close'] = df['close'].apply(lambda x: float(x))
+            # print('query_history_k_data_plus respond error_code:' + rs.error_code)
+            # print('query_history_k_data_plus respond  error_msg:' + rs.error_msg)
+            closed = df['close'].values
+            #closed = numpy.array([float(x) for x in closed])
+        elif method == 2:
+            # 根据时间计算bars个数
+            if ktype=='D':
+                count = 250*5;
+                unit = '1d'
+            if ktype=='W':
+                count = 250*5*5;
+                unit = '1w'
+            code_wm = code.startswith("6") and code+".XSHG" or code+".XSHE";
+            df = get_bars(code_wm, count, unit=unit, fields=['date', 'open', 'high', 'low', 'close', 'volume'], include_now=False,
+                          end_dt=end)
+            closed = df['close'].values
+        elif method == 3:
+            data_tdx = QATdx.QA_fetch_get_stock_day(code,start, end, if_fq='02', frequence=ktype)
+            closed = df['close'].values
+
         # 获取均线的数据，通过timeperiod参数来分别获取 5,10,20 日均线的数据。
         ma5 = talib.SMA(closed, timeperiod=5)
         ma10 = talib.SMA(closed, timeperiod=10)
@@ -74,6 +140,9 @@ def Fetch5_20(codes, ktype='D', start='2020-01-01',end='2020-04-14'):
 
     #print(newdf.to_html())
     print(newdf)
+    # 选择保存
+    ## df.to_csv('c:/day/000875.csv', columns=['open', 'high', 'low', 'close'])
+
     # 打印出来每一个数据
     # print(closed)
     # print(ma5)
@@ -94,6 +163,7 @@ def Fetch5_20(codes, ktype='D', start='2020-01-01',end='2020-04-14'):
 if __name__ == '__main__':
     codes = ["002157", "002400", "002727", "300142", "300168", "300558",]
     print("日")
-    Fetch5_20(codes,start='2018-01-01', end='2020-04-15')
+    today = '2020-04-15' #datetime.now().strftime('%Y-%m-%d') #
+    Fetch5_20(codes,start='2018-01-01', end=today)
     print("周")
-    Fetch5_20(codes, ktype='W', start='2012-01-01', end='2020-04-15')
+    Fetch5_20(codes, ktype='W', start='2012-01-01', end=today)
