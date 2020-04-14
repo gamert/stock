@@ -5,6 +5,11 @@ import talib
 from matplotlib import pyplot as plt
 import pandas as pd
 
+# 合并
+## pd.concat([df2,df3],axis=0,join='inner')
+## pd.concat([df2,df3],axis=1,join='inner')
+# df_merge =df1.merge(df3,on=['a','b'])
+
 pro = ts.pro_api()
 dat = pro.query('stock_basic', fields='symbol,name')
 
@@ -24,6 +29,7 @@ def Fetch5_20(codes, ktype='D', start='2020-01-01',end='2020-04-14'):
     # newdf = pd.DataFrame(data=None, index=None, columns=None, dtype=None, copy=False)
     newdf = pd.DataFrame(columns=['date', 'open', 'close', 'high', 'low', 'volume', 'code', 'ma5', 'ma10', 'ma20', 'ma60', 'ma120', 'ma250'])
     names = []
+    duotou = []
     #newdf = nil
     for code in codes:
         names.append(get_name(code))
@@ -39,6 +45,11 @@ def Fetch5_20(codes, ktype='D', start='2020-01-01',end='2020-04-14'):
         ma60 = talib.SMA(closed, timeperiod=60)
         ma120 = talib.SMA(closed, timeperiod=120)
         ma250 = talib.SMA(closed, timeperiod=250)
+
+        if(ma250[-1]<ma120[-1] and ma120[-1] < ma60[-1] and ma60[-1] < ma20[-1] and ma20[-1] < ma10[-1] and ma10[-1] < ma5[-1]):
+            duotou.append("多")
+        else:
+            duotou.append("")
 
         df['ma5'] = ma5
         df['ma10'] = ma10
@@ -58,6 +69,7 @@ def Fetch5_20(codes, ktype='D', start='2020-01-01',end='2020-04-14'):
     newdf = newdf.drop('low',axis=1)
     newdf = newdf.drop('volume',axis=1)
     newdf.insert(3, 'name', names)
+    newdf['duotou'] = duotou
 
 
     #print(newdf.to_html())
