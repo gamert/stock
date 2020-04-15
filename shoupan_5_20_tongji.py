@@ -5,6 +5,7 @@ import jqdatasdk
 import numpy
 import tushare as ts
 import talib
+from QUANTAXIS import QA_Setting
 from matplotlib import pyplot as plt
 import pandas as pd
 
@@ -14,6 +15,7 @@ from jqdatasdk import *
 
 
 from QUANTAXIS.QAFetch import QATdx as QATdx
+import QUANTAXIS as QA
 
 # 合并
 ## pd.concat([df2,df3],axis=0,join='inner')
@@ -31,6 +33,7 @@ method = 3 # 0 tushare 1 Bao 2 jqdatasdk 3 tdx
 pro = ts.pro_api()
 dat = pro.query('stock_basic', fields='symbol,name')
 
+
 if method == 1:
     #### 登陆系统 ####
     lg = bs.login()
@@ -45,12 +48,19 @@ if method == 2:
     print(jqdatasdk.__version__)
     print(get_query_count())
 
+if method == 3:
+    setting = QA_Setting()
+    setting.env_config()
 
 def get_name(stoke_code):
     '''通过股票代码导出公司名称'''
     company_name = list(dat.loc[dat['symbol'] == stoke_code].name)[0]
     return company_name
 
+def _MA(closed, count):
+    # 算术移动平均线
+    # return talib.MA(closed.values,timeperiod=count, matype=0)
+    return QA.MA(closed, count)
 
 def Fetch5_20(codes, ktype='D', start='2020-01-01',end='2020-04-15'):
     # newdf = pd.DataFrame(data=None, index=None, columns=None, dtype=None, copy=False)
@@ -69,7 +79,7 @@ def Fetch5_20(codes, ktype='D', start='2020-01-01',end='2020-04-15'):
             #df = ts.pro_bar(ts_code=code_wm, adj='qfq', freq=ktype, start_date=start.replace("-", ""), end_date=end.replace("-",""))
             ## 更新时间晚于21:30
             df = ts.get_k_data(code,ktype=ktype, start=start, end=end)
-            closed = df['close'].values
+            closed = df['close']
         # 提取收盘价
         elif method == 1:
             bcode = code.startswith("6") and "sh."+code or "sz."+code;
@@ -86,7 +96,7 @@ def Fetch5_20(codes, ktype='D', start='2020-01-01',end='2020-04-15'):
             df['close'] = df['close'].apply(lambda x: float(x))
             # print('query_history_k_data_plus respond error_code:' + rs.error_code)
             # print('query_history_k_data_plus respond  error_msg:' + rs.error_msg)
-            closed = df['close'].values
+            closed = df['close']
             #closed = numpy.array([float(x) for x in closed])
         elif method == 2:
             # 根据时间计算bars个数
@@ -99,18 +109,31 @@ def Fetch5_20(codes, ktype='D', start='2020-01-01',end='2020-04-15'):
             code_wm = code.startswith("6") and code+".XSHG" or code+".XSHE";
             df = get_bars(code_wm, count, unit=unit, fields=['date', 'open', 'high', 'low', 'close', 'volume'], include_now=False,
                           end_dt=end)
-            closed = df['close'].values
+            closed = df['close']
         elif method == 3:
-            data_tdx = QATdx.QA_fetch_get_stock_day(code,start, end, if_fq='02', frequence=ktype)
-            closed = df['close'].values
+            # df = QATdx.QA_fetch_get_stock_day(code,start, end, if_fq='00', frequence=ktype)
+            # if ktype in ['day', 'd', 'D', 'DAY', 'Day']:
+            df = QA.QA_fetch_stock_day_adv(code, start, end)
+            df = df.to_qfq()
+            if ktype in ['w', 'W', 'Week', 'week']:
+                df = df.resample('w')
+            else:
+                df = df.data
+            #closed = df.__getitem__('close')
+            # df = df.drop('date_stamp', axis=1)
+            # df = df.drop('vol', axis=1)
+            # df = df.drop('amount', axis=1)
+            closed = df['close']
+
 
         # 获取均线的数据，通过timeperiod参数来分别获取 5,10,20 日均线的数据。
-        ma5 = talib.SMA(closed, timeperiod=5)
-        ma10 = talib.SMA(closed, timeperiod=10)
-        ma20 = talib.SMA(closed, timeperiod=20)
-        ma60 = talib.SMA(closed, timeperiod=60)
-        ma120 = talib.SMA(closed, timeperiod=120)
-        ma250 = talib.SMA(closed, timeperiod=250)
+        # talib.SMA
+        ma5 = _MA(closed, 5)
+        ma10 = _MA(closed, 10)
+        ma20 = _MA(closed, 20)
+        ma60 = _MA(closed, 60)
+        ma120 = _MA(closed, 120)
+        ma250 = _MA(closed, 250)
 
         if(ma250[-1]<ma120[-1] and ma120[-1] < ma60[-1] and ma60[-1] < ma20[-1] and ma20[-1] < ma10[-1] and ma10[-1] < ma5[-1]):
             duotou.append("多")
