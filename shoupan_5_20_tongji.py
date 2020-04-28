@@ -152,12 +152,13 @@ def Fetch5_20(codes, ktype='D', start='2020-01-01',end='2020-04-15'):
         #     newdf = df.iloc [-1,]
 
     # 补全名字
+    newdf = newdf.drop('date',axis=1)
     newdf = newdf.drop('open',axis=1)
-    #newdf = newdf.drop('close',axis=1)
+    newdf = newdf.drop('code',axis=1)
     newdf = newdf.drop('high',axis=1)
     newdf = newdf.drop('low',axis=1)
     newdf = newdf.drop('volume',axis=1)
-    newdf.insert(3, 'name', names)
+    newdf.insert(0, 'name', names)
     newdf['duotou'] = duotou
 
 
@@ -184,9 +185,20 @@ def Fetch5_20(codes, ktype='D', start='2020-01-01',end='2020-04-15'):
 
 
 if __name__ == '__main__':
-    codes = ["002157", "002400", "002727", "300142", "300168", "300558",]
+    # "002400",
+    codes = [
+        "300002", # 300002 神州泰岳
+        "600845",# 600845 宝信软件
+        "002157",# 002157 正邦科技
+        "002727",# 002727 一心堂
+        "300142",# 300142 沃森生物
+        "300168",# 300168 万达信息
+        "300558",# 300558 贝达药业
+        "603882", # 603882 金域医学
+        "002568"# 002568 百润股份
+    ]
     print("日")
-    today = '2020-04-15' #datetime.now().strftime('%Y-%m-%d') #
+    today = datetime.now().strftime('%Y-%m-%d') #
     Fetch5_20(codes,start='2018-01-01', end=today)
     print("周")
     Fetch5_20(codes, ktype='W', start='2012-01-01', end=today)
