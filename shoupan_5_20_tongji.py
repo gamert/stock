@@ -30,10 +30,10 @@ pd.set_option('display.max_columns',500)
 pd.set_option('display.width',1000)
 
 method = 3 # 0 tushare 1 Bao 2 jqdatasdk 3 tdx
-pro = ts.pro_api()
-dat = pro.query('stock_basic', fields='symbol,name')
+# pro = ts.pro_api()
+# dat = pro.query('stock_basic', fields='symbol,name')
 
-
+dat = QA.QA_fetch_get_stock_list('pytdx')
 if method == 1:
     #### 登陆系统 ####
     lg = bs.login()
@@ -54,13 +54,21 @@ if method == 3:
 
 def get_name(stoke_code):
     '''通过股票代码导出公司名称'''
-    company_name = list(dat.loc[dat['symbol'] == stoke_code].name)[0]
+    company_name = list(dat.loc[dat['code'] == stoke_code].name)[0]
     return company_name
+
+# Series b.apply(lambda x:'%.2f' % x)
+# df.applymap(lambda x:'%.2f' % x)
+def _TruncateFloat(b):
+    return b.apply(lambda x:'%.2f' % x)
+#     for j in range(1,len(b),1):
+#         b.ix[j]=float('%.2f' %b.ix[j])
 
 def _MA(closed, count):
     # 算术移动平均线
     # return talib.MA(closed.values,timeperiod=count, matype=0)
-    return QA.MA(closed, count)
+    b = QA.MA(closed, count)
+    return _TruncateFloat(b)
 
 def Fetch5_20(codes, ktype='D', start='2020-01-01',end='2020-04-15'):
     # newdf = pd.DataFrame(data=None, index=None, columns=None, dtype=None, copy=False)
