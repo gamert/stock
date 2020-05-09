@@ -31,6 +31,11 @@ pd.set_option('display.max_columns',500)
 pd.set_option('display.width',1000)
 
 
+def time_convert(time_str):
+    time_obj = datetime.datetime.strptime(str(time_str), '%Y-%m-%d %H:%M:%S')
+    time_converted = time_obj.strftime('%Y/%m/%d')
+    return time_converted
+
 
 pro = ts.pro_api("1a5a1c37219acda3a569e8b809bd86b06ebc7c34d8dee170ef5ad5d1")
 # cal_dates = gen_save_exchange_calendar(pro, start_date='20120101')
@@ -179,9 +184,12 @@ def FetchKLineMa(code, ktype, start, end, is_index):
     # col_name.insert(col_name.index('code') + 1, 'name')  # 在 B 列后面插入
     # df.reindex(columns=col_name)
 #    df['name'] = ''
+    df['涨幅'] = ((df["close"] - df["close"].shift(1))/df["close"].shift(1)).apply(lambda x: '%.2f%%' % (x*100))
+    #df['涨幅'] = df['涨幅'].apply(lambda x: '%.2f%%' % (x*100)) # map(lambda x: (x*100)+"%")
     df['duotou'] = ''
 
-    df.loc[-1:, ('name')] = [get_name(code, is_index)]
+    stock_name = get_name(code, is_index)
+    df.loc[-1:, ('name')] = [stock_name]
     # 修改最后一列
     if (ma250[-1] < ma120[-1] and ma120[-1] < ma60[-1] and ma60[-1] < ma20[-1] and ma20[-1] < ma10[-1] and ma10[-1] <
             ma5[-1]):
@@ -191,7 +199,13 @@ def FetchKLineMa(code, ktype, start, end, is_index):
     else:
         #duotou.append("")
         pass
+    # data['timestamp'] = data['date'].apply(lambda x:time.mktime(time.strptime(x,'%Y-%m-%d %H:%M:%S')))
+    print(df.columns)
+    #df['time_stamp']=pd.to_datetime(df['time_stamp'],unit='s',origin=pd.Timestamp('2018-07-01'))
+    #df['date'].apply(lambda x: x.strftime('%Y{y}%m{m}%d{d}').format(y="年", m="月", d="日"))
+    #df['日期'] = df['日期'].apply(time_convert)
     print(df)
+    df.to_excel(stock_name+"_"+code+"_"+end+".xls",sheet_name=stock_name, na_rep="")
     return df
 
 def Fetch5_20(codes, ktype='D', start='2020-01-01',end='2020-04-15',is_index = False):
